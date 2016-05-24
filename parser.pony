@@ -1,11 +1,20 @@
 actor Main
   new create(env: Env) =>
     let t: Token[Id] val = recover Token[Id](TKISO) end
-    let l: Lexer[Id] = [t].values()
+    let l: Lexer[Id] = IterToLexer([t].values())
     let p: Parser[Id] = Parser[Id](l, TKEOF, TKLEXERROR)
     let g: Grammar = Grammar
     g.cap(p, "blerk")
 
+class IterToLexer is Lexer[Id]
+  let _iter: Iterator[Token[Id]]
+
+  new create(iter: Iterator[Token[Id]]) =>
+    _iter = iter
+
+  fun ref next(): Token[Id] => 
+    // let i: Iterator[Token[Id]] = _iter
+    try _iter.next() else recover Token[Id](TKEOF) end end
 
 // To do
 // DONE genericise parser/lexer/token over id type
@@ -79,7 +88,8 @@ class val Token[I: Any val]
   fun set_pos(other: Token[I]) => true
 
 
-interface Lexer[I: Any val] is Iterator[Token[I]]
+interface Lexer[I: Any val]
+  fun ref next(): Token[I]
 
 
 class Parser[I: Equatable[I] val]
@@ -108,14 +118,7 @@ class Parser[I: Equatable[I] val]
 
 
   fun ref next_lexer_token() =>
-    // FIXME make iterator type for which next doesn't fail
-    let newt: Token[I] = try 
-      _lexer.next() 
-    else 
-      let x: I = _eof
-      recover Token[I](x) end 
-    end  
-
+    let newt: Token[I] = _lexer.next() 
 
     match _token
     | let oldt: Token[I] => 
