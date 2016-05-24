@@ -13,7 +13,6 @@ class IterToLexer is Lexer[Id]
     _iter = iter
 
   fun ref next(): Token[Id] => 
-    // let i: Iterator[Token[Id]] = _iter
     try _iter.next() else recover Token[Id](TKEOF) end end
 
 // To do
