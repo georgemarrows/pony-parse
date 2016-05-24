@@ -1,7 +1,7 @@
 actor Main
   new create(env: Env) =>
-    let t: Token = Token(TKISO)
-    let l: Lexer = [t].values()
+    let t: Token[Id] val = recover Token[Id](TKISO) end
+    let l: Lexer[Id] = [t].values()
     let p: Parser = Parser(l)
     let g: Grammar = Grammar
     g.cap(p, "blerk")
@@ -69,41 +69,50 @@ class RuleState
     _default_id = default_id
 
 
-class Token
-  let _id: Id
+class val Token[I: Any val]
+  let _id: I
 
-  new create(myid: Id) => _id = myid
+  new create(myid: I) => _id = myid
   fun line_number(): U32 => 0
-  fun id(): Id => _id
-  fun set_pos(other: Token) => true
+  fun id(): I => _id
+  fun set_pos(other: Token[I]) => true
 
 
-type Lexer is Iterator[Token]
+interface Lexer[I: Any val] is Iterator[Token[I]]
 
 
 class Parser
 
-  var _token: (Token | None) = None
-  var _current_token_id: Id = TKNONE
+  var _token: (Token[Id] | None) = None
   var _last_token_line: U32 = 0
 
-  let _lexer: Lexer
+  let _lexer: Lexer[Id]
 
 
-  new create(lexer: Lexer) =>
+  new create(lexer: Lexer[Id]) =>
     _lexer = lexer
 
-  fun current_token_id(): Id => _current_token_id
+  fun current_token_id(): (Id | None) => 
+    try
+      (_token as Token[Id]).id()
+    else
+      None
+    end
 
   fun propogate_error(state: RuleState): ParseResult => (PARSEFAIL, false)
 
 
   fun ref next_lexer_token() =>
     // FIXME make iterator type for which next doesn't fail
-    let newt = try _lexer.next() else Token(TKEOF) end  
+    let newt: Token[Id] = try 
+      _lexer.next() 
+    else 
+      recover Token[Id](TKEOF) end 
+    end  
+
 
     match _token
-    | let oldt: Token => 
+    | let oldt: Token[Id] => 
         _last_token_line = oldt.line_number()
         if newt.id() is TKEOF then
           newt.set_pos(oldt)
@@ -127,7 +136,11 @@ class Parser
   // assert(state != NULL);
   // assert(id_set != NULL);
 
-    let id: Id = current_token_id()
+    let id: Id = try 
+      current_token_id() as Id
+    else 
+      return (PARSEFAIL, false)  // Shouldn't happen
+    end
 
 
     if id is TKLEXERROR then return propogate_error(state) end
