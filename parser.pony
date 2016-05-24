@@ -1,10 +1,15 @@
 actor Main
   new create(env: Env) =>
-    let t: Token[Id] val = recover Token[Id](TKISO) end
-    let l: Lexer[Id] = IterToLexer([t].values())
+    test([Token[Id](TKISO)], PARSEOK, env)
+    test([Token[Id](TKLEXERROR)], PARSEFAIL, env)
+
+
+  fun test(ids: Array[Token[Id]], result: Ast, env: Env) =>
+    let l: Lexer[Id] = IterToLexer(ids.values())
     let p: Parser[Id] = Parser[Id](l, TKEOF, TKLEXERROR)
     let g: Grammar = Grammar
-    g.cap(p, "blerk")
+    env.out.print(g.cap(p, "blerk").string())
+
 
 class IterToLexer is Lexer[Id]
   let _iter: Iterator[Token[Id]]
@@ -13,7 +18,7 @@ class IterToLexer is Lexer[Id]
     _iter = iter
 
   fun ref next(): Token[Id] => 
-    try _iter.next() else recover Token[Id](TKEOF) end end
+    try _iter.next() else Token[Id](TKEOF) end
 
 // To do
 // DONE genericise parser/lexer/token over id type
@@ -57,8 +62,15 @@ primitive TKEOF is Equatable[Id]
 type Id is (TKLEXERROR | TKISO | TKTRN | TKREF | TKVAL | TKBOX | TKTAG | TKNONE | TKEOF)
 
 
-primitive PARSEOK
-primitive PARSEFAIL
+primitive PARSEOK is Stringable
+  fun string(fmt: FormatSettings = FormatSettingsDefault): String iso^
+  =>
+    "PARSEOK".string(fmt)
+
+primitive PARSEFAIL is Stringable
+  fun string(fmt: FormatSettings = FormatSettingsDefault): String iso^
+  =>
+    "PARSEFAIL".string(fmt)
 
 type Ast is (PARSEOK | PARSEFAIL)
 
@@ -81,7 +93,7 @@ class RuleState[I: Any val]
 class val Token[I: Any val]
   let _id: I
 
-  new create(myid: I) => _id = myid
+  new val create(myid: I) => _id = myid
   fun line_number(): U32 => 0
   fun id(): I => _id
   fun set_pos(other: Token[I]) => true
@@ -93,38 +105,30 @@ interface Lexer[I: Any val]
 
 class Parser[I: Equatable[I] val]
 
-  var _token: (Token[I] | None) = None
-  var _last_token_line: U32 = 0
-
   let _lexer: Lexer[I]
   let _eof: I
   let _lexerror: I
 
+  var _token: Token[I]
+  var _last_token_line: U32 = 0
 
   new create(lexer: Lexer[I], eof: I, lexerror: I) =>
     _lexer = lexer
     _eof = eof
     _lexerror = lexerror
+    _token = lexer.next()
 
-  fun current_token_id(): (I | None) => 
-    try
-      (_token as Token[I]).id()
-    else
-      None
-    end
+  fun current_token_id(): I => _token.id()
 
   fun propogate_error(state: RuleState[I]): ParseResult => (PARSEFAIL, false)
 
-
   fun ref next_lexer_token() =>
     let newt: Token[I] = _lexer.next() 
-
-    match _token
-    | let oldt: Token[I] => 
-        _last_token_line = oldt.line_number()
-        if newt.id().eq(_eof) then
-          newt.set_pos(oldt)
-        end
+    let oldt: Token[I] = _token
+    
+    _last_token_line = oldt.line_number()
+    if newt.id().eq(_eof) then
+      newt.set_pos(oldt)
     end
 
     _token = newt
@@ -144,12 +148,7 @@ class Parser[I: Equatable[I] val]
   // assert(state != NULL);
   // assert(id_set != NULL);
 
-    let id: I = try 
-      current_token_id() as I
-    else 
-      return (PARSEFAIL, false)  // Shouldn't happen
-    end
-
+    let id: I = current_token_id()
 
     if id.eq(_lexerror) then return propogate_error(state) end
 
