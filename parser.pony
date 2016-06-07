@@ -1,27 +1,84 @@
-actor Main
-  let _env: Env
-
-  new create(env: Env) =>
-    _env = env
-    test([Token[Id](TKISO)], PARSEOK)
-    test([Token[Id](TKLEXERROR)], PARSEFAIL)
-    test2([Token[Id](TKLSQUARE), Token[Id](TKISO)], PARSEOK)
-    test2([Token[Id](TKISO)], PARSEFAIL)
-    test2([Token[Id](TKLSQUARE), Token[Id](TKEOF)], PARSEFAIL)
-    test2([Token[Id](TKLSQUARE), Token[Id](TKLSQUARE)], PARSEFAIL)
+use "ponytest"
+use "collections"
 
 
-  fun test(ids: Array[Token[Id]], result: Ast) =>
+// To do
+// DONE genericise parser/lexer/token over id type
+// DONE make test case parse work
+// DONE use pony testing framework
+// - tracing
+// - full parse array
+// - make AST
+// - genericise over AST type
+// - Ruby script to generate from parser.c
+
+
+actor Main is TestList
+  // let _env: Env
+
+  new create(env: Env) => PonyTest(env, this)
+    // _env = env
+    // PonyTest(env, this)
+
+  // new make() => None
+
+  fun tag tests(test: PonyTest) =>
+    test(_TestParseCap)
+    test(_TestParseArray)
+
+
+class iso _TestParseCap is UnitTest
+  """
+  XXX
+  """
+  // let _env: Env
+
+  // new create(env: Env) =>
+  //   _env = env
+
+  fun name(): String => "Pony/parse.cap"
+
+  fun apply(h: TestHelper) =>
+    test(h, PARSEOK,   [Token[Id](TKISO)])
+    test(h, PARSEFAIL, [Token[Id](TKLEXERROR)])
+
+
+  fun test(h: TestHelper, result: Ast, ids: Array[Token[Id]]) =>
     let l: Lexer[Id] = IterToLexer(ids.values())
-    let p: Parser[Id] = Parser[Id](l, TKEOF, TKLEXERROR, _env)
+    let p: Parser[Id] = Parser[Id](l, TKEOF, TKLEXERROR) //, _env)
     let g: Grammar = Grammar
-    _env.out.print(g.cap(p, "blerk").string())
+    h.assert_is[Ast](result, g.cap(p, "blerk"))
+    // _env.out.print(g.cap(p, "blerk").string())
 
-  fun test2(ids: Array[Token[Id]], result: Ast) =>
+
+class iso _TestParseArray is UnitTest
+  """
+  XXX
+  """
+  // let _env: Env
+
+  // new create(env: Env) =>
+  //   _env = env
+
+  fun name(): String => "Pony/parse.array"
+
+  fun apply(h: TestHelper) =>
+    test(h, PARSEOK,   [Token[Id](TKLSQUARE), Token[Id](TKISO)])
+    test(h, PARSEFAIL, [Token[Id](TKISO)])
+    test(h, PARSEFAIL, [Token[Id](TKLSQUARE), Token[Id](TKEOF)])
+    test(h, PARSEFAIL, [Token[Id](TKLSQUARE), Token[Id](TKLSQUARE)])
+
+
+  fun test(h: TestHelper, result: Ast, ids: Array[Token[Id]]) =>
     let l: Lexer[Id] = IterToLexer(ids.values())
-    let p: Parser[Id] = Parser[Id](l, TKEOF, TKLEXERROR, _env)
+    let p: Parser[Id] = Parser[Id](l, TKEOF, TKLEXERROR) //, _env)
     let g: Grammar = Grammar
-    _env.out.print(g.array(p, "blerk").string())
+    h.assert_is[Ast](result, g.array(p, "blerk"))
+    // _env.out.print(g.cap(p, "blerk").string())
+
+
+
+
 
 
 class IterToLexer is Lexer[Id]
@@ -33,13 +90,7 @@ class IterToLexer is Lexer[Id]
   fun ref next(): Token[Id] => 
     try _iter.next() else Token[Id](TKEOF) end
 
-// To do
-// DONE genericise parser/lexer/token over id type
-// DONE make test case parse work
-// - make AST
-// - tracing
-// - genericise over AST type
-// - add seq
+
 
 
 
@@ -138,17 +189,19 @@ class Parser[I: Equatable[I] val]
   let _lexer: Lexer[I]
   let _eof: I
   let _lexerror: I
-  let _env: Env
+  // let _env: Env
 
   var _token: Token[I]
   var _last_token_line: U32 = 0
   var _last_matched: String = ""
 
-  new create(lexer: Lexer[I], eof: I, lexerror: I, env: Env) =>
+  new create(lexer: Lexer[I], eof: I, lexerror: I
+    // , env: Env
+    ) =>
     _lexer = lexer
     _eof = eof
     _lexerror = lexerror
-    _env = env
+    // _env = env
 
     _token = lexer.next()
 
