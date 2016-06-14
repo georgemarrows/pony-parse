@@ -6,8 +6,8 @@ use "collections"
 // DONE genericise parser/lexer/token over id type
 // DONE make test case parse work
 // DONE use pony testing framework
-// - tracing
-// - full parse array
+// DONE tracing
+// DONE full parse array
 // - make AST
 // - genericise over AST type
 // - Ruby script to generate from parser.c
@@ -52,19 +52,31 @@ class iso _TestParseArray is UnitTest
   fun name(): String => "Pony/parse.array"
 
   fun apply(h: TestHelper) =>
-    test(h, PARSEOK,   [Token[Id](TkLSquare), Token[Id](TkIso)])
-    test(h, PARSEERROR, [Token[Id](TkIso)])
-    test(h, PARSEERROR, [Token[Id](TkLSquare), Token[Id](TkEof)])
-    test(h, PARSEERROR, [Token[Id](TkLSquare), Token[Id](TkLSquare)])
+    test(h, PARSEOK,    [as Id: TkLSquare, TkIso, TkComma, TkRef, TkRSquare])
+    
+    test(h, RULENOTFOUND, [as Id: TkIso])
+
+    test(h, PARSEERROR, [as Id: TkLSquare, TkEof])
+    test(h, PARSEERROR, [as Id: TkLSquare, TkLSquare])
+    test(h, PARSEERROR, [as Id: TkLSquare, TkComma])
+    test(h, PARSEERROR, [as Id: TkLSquare, TkComma, TkComma]) 
+    test(h, PARSEERROR, [as Id: TkLSquare, TkIso, TkIso])
 
 
-  fun test(h: TestHelper, result: Ast, ids: Array[Token[Id]]) =>
+  fun test(h: TestHelper, expected: Ast, ids: Array[Id]) =>
+    let toks = Array[Token[Id]](ids.size())
+    for id in ids.values() do
+      toks.push(Token[Id](id))
+    end
     let trace = Trace(h.env.out)
     trace.log("-----------")
-    let l: Lexer[Id] = IterToLexer(ids.values())
+    let l: Lexer[Id] = IterToLexer(toks.values())
     let p: Parser[Id] = Parser[Id](l, TkEof, TkLexError, trace)
     let g: Grammar = Grammar
-    h.assert_is[Ast](result, g.array(p, "blerk"))
+    let actual = g.array(p, "blerk")
+    h.assert_is[Ast](expected, actual, 
+                     "Expected " + expected.string() + 
+                     " actual " + actual.string())
 
 
 
@@ -115,6 +127,8 @@ primitive TkTag              is Tk fun show(): String => "tag"
 
 primitive TkLSquare          is Tk fun show(): String => "["
 primitive TkLSquareNew       is Tk fun show(): String => "["
+primitive TkRSquare          is Tk fun show(): String => "]"
+primitive TkComma            is Tk fun show(): String => ","
 
 primitive TkLexError         is Tk fun show(): String => "** lex error **"
 primitive TkNone             is Tk fun show(): String => "** none **"
@@ -122,7 +136,7 @@ primitive TkEof              is Tk fun show(): String => "** eof **"
 
 
 type Id is (TkIso | TkTrn | TkRef | TkVal | TkBox | TkTag | 
-            TkLSquare | TkLSquareNew | 
+            TkLSquare | TkLSquareNew | TkRSquare | TkComma | 
             TkEof | TkNone | TkLexError)
 
 
@@ -150,14 +164,16 @@ type ParseResult is (Ast, Bool)
 class RuleState[I: Any val]
   let rule_name: String
   let _rule_desc: String
-  let _default_id: I
+  var default_id: I
+  var matched: Bool
 
   new create(rule_name': String,
             rule_desc: String,
-            default_id: I) =>
+            default_id': I) =>
     rule_name = rule_name'
     _rule_desc = rule_desc
-    _default_id = default_id
+    default_id = default_id'
+    matched = false
 
 
 class val Token[I: Any val]
@@ -182,27 +198,23 @@ actor Trace
 class Parser[I: Tk val]
   let _lexer: Lexer[I]
   let _eof: I
-  let _lexerror: I
+  let lexerror: I
   let _trace: Trace tag
 
   var _token: Token[I]
   var _last_token_line: U32 = 0
   var _last_matched: String = ""
 
-  new create(lexer: Lexer[I], eof: I, lexerror: I
+  new create(lexer: Lexer[I], eof: I, lexerror': I
     , trace: Trace tag
     ) =>
     _lexer = lexer
     _eof = eof
-    _lexerror = lexerror
+    lexerror = lexerror'
     _trace = trace
 
     _token = lexer.next()
 
-
-  fun current_token_id(): I => _token.id()
-
-  fun propogate_error(state: RuleState[I]): ParseResult => (PARSEERROR, false)
 
   fun ref next_lexer_token() =>
     let newt: Token[I] = _lexer.next() 
@@ -289,16 +301,18 @@ class Parser[I: Tk val]
 
   fun ref parse_token_set(state: RuleState[I],
                       desc: (String | None),
+                      cmd_name: String,
                       terminating: (String | None),
                       id_set: Array[I],
                       make_ast: Bool): ParseResult => 
 
     let id: I = current_token_id()
 
-    if id.eq(_lexerror) then return propogate_error(state) end
+    if id.eq(lexerror) then return propogate_error(state) end
 
     // FIXME optional vs required in logging
-    _trace.log("Rule " + state.rule_name + " looking for tokens '" +
+    _trace.log("Rule " + state.rule_name + 
+                 " " + cmd_name + " looking for tokens '" +
                  try desc as String else "" end + 
                  "'. Found " +
                  try id.show() else "XXX" end)
@@ -363,12 +377,13 @@ class Parser[I: Tk val]
 
   fun ref parse_rule_set(state: RuleState[I], 
                          desc: String,
+                         cmd_name: String,
                          rule_set: Array[ { (Parser[I], String): Ast } box ]): ParseResult => 
     let id: I = current_token_id()
 
-    if id.eq(_lexerror) then return propogate_error(state) end
+    if id.eq(lexerror) then return propogate_error(state) end
     
-    let rule = "Rule " + state.rule_name
+    let rule = "Rule " + state.rule_name + " " + cmd_name
 
     // FIXME optional vs required rules
     _trace.log(rule + " looking for rule '" + desc + "'")
@@ -393,25 +408,44 @@ class Parser[I: Tk val]
 
 
 
+  fun current_token_id(): I => _token.id()
+
+  fun propogate_error(state: RuleState[I]): ParseResult => (PARSEERROR, false)
+
+
   fun handle_found(state: RuleState[I], blerk: Ast): ParseResult => 
+    if not state.matched then
+      _trace.log("Rule " + state.rule_name + ": Matched")
+      state.matched = true
+    end
     (PARSEOK, true)
+
 
   fun handle_not_found(state: RuleState[I], 
                        desc:  (String | None), 
                        terminating: (String | None)): ParseResult =>
+
+    if not state.default_id.eq(lexerror) then
+      // FIXME deferrable_ast
+      state.default_id = lexerror
+      return (PARSEOK, false)
+    end
+
+    if not state.matched then
+      _trace.log("Rule " + state.rule_name + ": Not matched")
+      return (RULENOTFOUND, false)
+    end
+
+    // if state.restart is None then
+    //   return (PARSE_ERROR, false)
+    // end
+
     (PARSEERROR, false)
 
-  fun consume_token(): Ast => PARSEOK
 
-
-// static ast_t* consume_token(parser_t* parser)
-// {
-//   ast_t* ast = ast_token(parser->token);
-//   ast_setflag(ast, parser->next_flags);
-//   parser->next_flags = 0;
-//   fetch_next_lexer_token(parser, false);
-//   return ast;
-// }
+  fun ref consume_token(): Ast => 
+    next_lexer_token()
+    PARSEOK
 
   fun ref consume_token_no_ast() => next_lexer_token()
 
@@ -422,7 +456,6 @@ class Parser[I: Tk val]
 
 primitive Grammar
 
-// CAP
 // DEF(cap);
 //   TOKEN("capability", TK_ISO, TK_TRN, TK_REF, TK_VAL, TK_BOX, TK_TAG);
 //   DONE();
@@ -431,14 +464,14 @@ primitive Grammar
   fun cap(parser: Parser[Id], 
           // builder_fn_t *out_builder,
           rule_desc: String): Ast =>
-//    (void)out_builder; \
-    let state: RuleState[Id] = RuleState[Id]("cap", rule_desc, TkLexError)
+    let state: RuleState[Id] = RuleState[Id]("cap", rule_desc, parser.lexerror)
 
     //   TOKEN("capability", TK_ISO, TK_TRN, TK_REF, TK_VAL, TK_BOX, TK_TAG);
     let id_set: Array[Id] = [as Id: TkIso, TkTrn, TkRef, TkVal, TkBox, TkTag]
 
     (let r: Ast, let found: Bool) = parser.parse_token_set(state, 
-                                                          "capability", 
+                                                          "capability",
+                                                          "TOKEN",
                                                           None, 
                                                           id_set, 
                                                           true)
@@ -461,7 +494,8 @@ primitive Grammar
   // DEF(array);
   fun array(parser: Parser[Id],
             rule_desc: String): Ast =>
-    let state: RuleState[Id] = RuleState[Id]("array", rule_desc, TkLexError)
+    let state: RuleState[Id] = RuleState[Id]("array", rule_desc, 
+                                             parser.lexerror)
 
 //   PRINT_INLINE();
 //   AST_NODE(TK_ARRAY);
@@ -469,7 +503,8 @@ primitive Grammar
     let id_set: Array[Id] = [as Id: TkLSquare, TkLSquareNew]
 
     (let r: Ast, let found: Bool) = parser.parse_token_set(state, 
-                                                           None, 
+                                                           "square bracket",
+                                                           "SKIP",
                                                            None, 
                                                            id_set, 
                                                            false)
@@ -482,38 +517,49 @@ primitive Grammar
     let rule_set = [as { (Parser[Id], String): Ast } box: this~cap()]
 
     (let rr: Ast, let ff: Bool) = parser.parse_rule_set(state,
-                                                        "array element", 
+                                                        "array element",
+                                                        "RULE",
                                                         rule_set)
 
     if (not (rr is PARSEOK)) then return rr end
 
 
 //   WHILE(TK_COMMA, RULE("array element", rawseq));
+    let id_set2 = [as Id: TkComma]
+    while true do
+      state.default_id = TkEof // FIXME parser.eof
+      (let r3: Ast, let f3: Bool) = parser.parse_token_set(state,
+                                                           TkComma.show(),
+                                                           "WHILE",
+                                                           None,
+                                                           id_set2,
+                                                           false)
+      if not (r3 is PARSEOK) then return r3 end
+      if not f3 then break end
+
+      let rule_set2 = [as { (Parser[Id], String): Ast } box: this~cap()]
+
+      (let r4: Ast, let f4: Bool) = parser.parse_rule_set(state,
+                                                        "array element",
+                                                        "RULE",
+                                                        rule_set2)
+
+       if not (r4 is PARSEOK) then return r4 end
+    end
+
+
 //   TERMINATE("array literal", TK_RSQUARE);
+    let id_set5: Array[Id] = [as Id: TkRSquare]
+
+    (let r5: Ast, let f5: Bool) = parser.parse_token_set(state, 
+                                                         None,
+                                                         "TERMINATE",
+                                                         "array literal", 
+                                                         id_set5, 
+                                                         false)
+    
+    if not (r5 is PARSEOK) then return r5 end
 
 //   DONE();
     parser.rule_complete(state)
-
-
-/// State of parsing current rule
-// typedef struct rule_state_t
-// {
-//   const char* fn_name;  // Name of the current function, for tracing
-//   ast_t* ast;           // AST built for this rule
-//   ast_t* last_child;    // Last child added to current ast
-//   const char* desc;     // Rule description (set by parent)
-//   token_id* restart;    // Restart token set, NULL for none
-//   token_id deflt_id;    // ID of node to create when an optional token or rule
-//                         // is not found.
-//                         // TK_EOF = do not create a default
-//                         // TL_LEX_ERROR = rule is not optional
-//   bool matched;         // Has the rule matched yet
-//   bool scope;           // Is this rule a scope
-//   bool deferred;        // Do we have a deferred AST node
-//   token_id deferred_id; // ID of deferred AST node
-//   size_t line, pos;     // Location to claim deferred node is from
-// } rule_state_t;
-
-//     rule_state_t state = {#rule, NULL, NULL, rule_desc, NULL, TK_LEX_ERROR, \
-//       false, false, false, TK_NONE, 0, 0}
 
