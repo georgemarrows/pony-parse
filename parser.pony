@@ -25,58 +25,58 @@ actor Main is TestList
     test(_TestParseArray)
 
 
-class iso _TestParseCap is UnitTest
+trait iso _TestParse is UnitTest
+  
+  fun test(expected: Ast, 
+           ids: Array[Id], 
+           h: TestHelper, 
+           rule: { (Parser[Id], String): Ast } box) =>
+    let toks = Array[Token[Id]](ids.size())
+    for id in ids.values() do
+      toks.push(Token[Id](id))
+    end
+
+    let trace = Trace(h.env.out)
+    trace.log("-----------")
+    
+    let l: Lexer[Id] = IterToLexer(toks.values())
+    let p: Parser[Id] = Parser[Id](l, TkEof, TkLexError, trace)
+    let actual = rule(p, "blerk")
+    h.assert_is[Ast](expected, actual, 
+                     "Expected " + expected.string() + 
+                     " actual " + actual.string())  
+
+
+class iso _TestParseCap is _TestParse
   """
   XXX
   """
   fun name(): String => "Pony/parse.cap"
 
   fun apply(h: TestHelper) =>
-    test(h, PARSEOK,   [Token[Id](TkIso)])
-    test(h, PARSEERROR, [Token[Id](TkLexError)])
+    let rule = Grammar~cap()
+    test(PARSEOK,    [as Id: TkIso], h, rule)
+    test(PARSEERROR, [as Id: TkLexError], h, rule)
 
 
-  fun test(h: TestHelper, result: Ast, ids: Array[Token[Id]]) =>
-    let trace = Trace(h.env.out)
-    trace.log("-----------")
-    let l: Lexer[Id] = IterToLexer(ids.values())
-    let p: Parser[Id] = Parser[Id](l, TkEof, TkLexError, trace)
-    let g: Grammar = Grammar
-    h.assert_is[Ast](result, g.cap(p, "blerk"))
-
-
-class iso _TestParseArray is UnitTest
+class iso _TestParseArray is _TestParse
   """
   XXX
   """
   fun name(): String => "Pony/parse.array"
 
   fun apply(h: TestHelper) =>
-    test(h, PARSEOK,    [as Id: TkLSquare, TkIso, TkComma, TkRef, TkRSquare])
-    
-    test(h, RULENOTFOUND, [as Id: TkIso])
+    let rule = Grammar~array()
+    test(PARSEOK,    [as Id: TkLSquare, TkIso, TkComma, TkRef, TkRSquare], h, rule)
+    test(RULENOTFOUND, [as Id: TkIso], h, rule)
+    test(PARSEERROR, [as Id: TkLSquare, TkEof], h, rule)
+    test(PARSEERROR, [as Id: TkLSquare, TkLSquare], h, rule)
+    test(PARSEERROR, [as Id: TkLSquare, TkComma], h, rule)
+    test(PARSEERROR, [as Id: TkLSquare, TkComma, TkComma], h, rule)
+    test(PARSEERROR, [as Id: TkLSquare, TkIso, TkIso], h, rule)
 
-    test(h, PARSEERROR, [as Id: TkLSquare, TkEof])
-    test(h, PARSEERROR, [as Id: TkLSquare, TkLSquare])
-    test(h, PARSEERROR, [as Id: TkLSquare, TkComma])
-    test(h, PARSEERROR, [as Id: TkLSquare, TkComma, TkComma]) 
-    test(h, PARSEERROR, [as Id: TkLSquare, TkIso, TkIso])
 
-
-  fun test(h: TestHelper, expected: Ast, ids: Array[Id]) =>
-    let toks = Array[Token[Id]](ids.size())
-    for id in ids.values() do
-      toks.push(Token[Id](id))
-    end
-    let trace = Trace(h.env.out)
-    trace.log("-----------")
-    let l: Lexer[Id] = IterToLexer(toks.values())
-    let p: Parser[Id] = Parser[Id](l, TkEof, TkLexError, trace)
-    let g: Grammar = Grammar
-    let actual = g.array(p, "blerk")
-    h.assert_is[Ast](expected, actual, 
-                     "Expected " + expected.string() + 
-                     " actual " + actual.string())
+  
 
 
 
