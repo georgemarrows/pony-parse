@@ -4,19 +4,6 @@ use "../../rdparser"
 use "../../ponyparser"
 
 
-// To do
-// DONE genericise parser/lexer/token over id type
-// DONE make test case parse work
-// DONE use pony testing framework
-// DONE tracing
-// DONE full parse array
-// - README.md
-// - rename Tk in rdparser
-// - make AST
-// - genericise over AST type
-// - Ruby script to generate from parser.c
-
-
 
 actor Main is TestList
 
