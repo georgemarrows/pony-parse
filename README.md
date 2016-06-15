@@ -33,3 +33,8 @@ Use `test --sequential` to avoid tracing output from different tests getting mix
 * rename Tk in rdparser
 * Add support for more parsing macros from parserapi.h
 
+
+## Acknowledgements
+
+* Includes portions of @jemc's pony-ast project, namely the Tk token definitions for the Pony language.
+
