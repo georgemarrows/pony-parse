@@ -20,15 +20,17 @@ Possible uses:
 
 ## To run
 
-* `cd ponyparser/test`
-* `ponyc && test`
+Using Rake (Ruby build tool)
 
-Use `test --sequential` to avoid tracing output from different tests getting mixed together.
+* `cd ponyparser`
+* `rake`
+
+This will build the parser and run all tests.
 
 
 ## Short-term roadmap
 
-* Ruby script to generate Pony source from parser.c; switch ponyparser to use it
+* DONE Ruby script to generate Pony source from parser.c; switch ponyparser to use it
 * make AST and genericise over AST type
 * rename Tk in rdparser
 * Add support for more parsing macros from parserapi.h
