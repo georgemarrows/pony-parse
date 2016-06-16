@@ -12,15 +12,56 @@ DEF = """
     let state: RuleState[Id] = RuleState[Id](\"RULE_NAME\", rule_desc, parser.lexerror)
 """
 
-def def_macro(rule_name)
-	puts DEF.gsub(/RULE_NAME/, rule_name)
-end
-
-def done_macro()
-	puts """
+DONE = """
     parser.rule_complete(state)
 
 """
+
+TOKEN = """
+    let id_setINDEX: Array[Id] = [as Id: TOKENS]
+
+    (let rINDEX: Ast, let foundINDEX: Bool) = 
+        parser.parse_token_set(state, 
+                               RULE_DESC,
+                               \"TOKEN\",
+                               None, 
+                               id_setINDEX, 
+                               true)
+    if (not (rINDEX is PARSEOK)) then return rINDEX end
+"""
+
+SKIP = """
+    let id_setINDEX: Array[Id] = [as Id: TOKENS]
+
+    (let rINDEX: Ast, let foundINDEX: Bool) = 
+        parser.parse_token_set(state, 
+                               RULE_DESC,
+                               \"SKIP\",
+                               None, 
+                               id_setINDEX, 
+                               false)
+    if (not (rINDEX is PARSEOK)) then return rINDEX end
+"""
+
+RULE = """
+    let rule_setINDEX = [as { (Parser[Id], String): Ast } box: RULES]
+
+    (let rINDEX: Ast, let foundINDEX: Bool) = 
+        parser.parse_rule_set(state,
+                              RULE_DESC,
+                              \"RULE\",
+                              rule_setINDEX)
+
+    if (not (rINDEX is PARSEOK)) then return rINDEX end
+"""
+
+
+def nullToNone(s)
+	if s == "NULL"
+		"None"
+	else
+		s
+	end
 end
 
 def special_map_token_part(part)
@@ -44,114 +85,63 @@ def convert_token_string(tokens)
 	end.join(", ")
 end
 
-TOKEN = """
-    let id_setINDEX: Array[Id] = [as Id: TOKENS]
-
-    (let rINDEX: Ast, let foundINDEX: Bool) = 
-        parser.parse_token_set(state, 
-                               RULE_DESC,
-                               \"TOKEN\",
-                               None, 
-                               id_setINDEX, 
-                               true)
-    if (not (rINDEX is PARSEOK)) then return rINDEX end
-"""
-
-
-def token_macro(index, desc, tokens)
-	puts TOKEN.gsub(/TOKENS/, convert_token_string(tokens))
-	          .gsub(/RULE_DESC/, nullToNone(desc))
-	          .gsub(/INDEX/, index.to_s)
+def convert_rule_string(rules)
+	rules.strip
+	     .split(/\s*,\s*/)
+	     .map {|r| "this~#{r}()"}
+	     .join(",")
 end
 
-
-SKIP = """
-    let id_setINDEX: Array[Id] = [as Id: TOKENS]
-
-    (let rINDEX: Ast, let foundINDEX: Bool) = 
-        parser.parse_token_set(state, 
-                               RULE_DESC,
-                               \"SKIP\",
-                               None, 
-                               id_setINDEX, 
-                               false)
-    if (not (rINDEX is PARSEOK)) then return rINDEX end
-"""
-
-def nullToNone(s)
-	if s == "NULL"
-		"None"
-	else
-		s
+def macro_convert(index, template, mappings = {})
+	template = template.gsub(/INDEX/, index.to_s)
+	mappings.each do |name, value|
+		template = template.gsub(name.to_s, value)
 	end
+	template
 end
 
-
-def skip_macro(index, desc, tokens)
-	puts SKIP.gsub(/TOKENS/, convert_token_string(tokens))
-	         .gsub(/RULE_DESC/, nullToNone(desc))
-	         .gsub(/INDEX/, index.to_s)
-end
-
-RULE = """
-     let rule_setINDEX = [as { (Parser[Id], String): Ast } box: RULES]
-
-     (let rINDEX: Ast, let foundINDEX: Bool) = 
-         parser.parse_rule_set(state,
-                               RULE_DESC,
-                               \"RULE\",
-                               rule_setINDEX)
-
-     if (not (rINDEX is PARSEOK)) then return rINDEX end
-"""
-
-def rule_macro(index, desc, rules)
-	rules = rules.strip.split(/\s*,\s*/)
-
-	puts RULE.gsub(/RULES/, rules.map {|r| "this~#{r}()"}.join(","))
-	         .gsub(/RULE_DESC/, nullToNone(desc))
-	         .gsub(/INDEX/, index.to_s)
-end
-
-def comment(line)
+def convert_line(index, line)
 	print "\n    // #{line.strip}"
+
+	case line
+	#when %r{^\w*//}  # comment, ignore
+	when %r{^ \s* DEF \( (.*?) \) }x
+		index = 0
+		puts macro_convert(index, DEF, 
+			               :RULE_NAME => $~[1])
+	when %r{^ \s* DONE }x
+		puts macro_convert(index, DONE)
+	when %r{^ \s* TOKEN \( (.*?) , (.*?) \) }x
+		puts macro_convert(index, TOKEN,
+			               :RULE_DESC => nullToNone($~[1]),
+			               :TOKENS => convert_token_string($~[2]))
+	when %r{^ \s* SKIP \( (.*?) , (.*?) \) }x
+		puts macro_convert(index, SKIP,
+			               :RULE_DESC => nullToNone($~[1]),
+			               :TOKENS => convert_token_string($~[2]))
+	when %r{^ \s* RULE \( (.*?) , (.*?) \) }x
+		puts macro_convert(index, RULE,
+			               :RULE_DESC => nullToNone($~[1]),
+			               :RULES => convert_rule_string($~[2])
+			              )
+	end
+
+	index
 end
+
+
 
 
 fname = ARGV[0]
-puts fname
 
 lines = File.readlines(fname)
 
 index = 0  # used to uniquify var names in a single Pony function
 lines.each do |line|
-
 	index += 1
-
-	case line
-	#when %r{^\w*//}  # comment, ignore
-	when %r{^ \s* DEF \( (.*?) \) }x
-		comment(line)
-		index = 0
-		rule_name = Regexp::last_match[1]
-		def_macro(rule_name)
-	when %r{^ \s* DONE }x
-		comment(line)
-		done_macro()
-	when %r{^ \s* TOKEN \( (.*?) , (.*?) \) }x
-		comment(line)
-		desc = Regexp::last_match[1]
-		tokens = Regexp::last_match[2]
-		token_macro(index, desc, tokens)
-	when %r{^ \s* SKIP \( (.*?) , (.*?) \) }x
-		comment(line)
-		desc = Regexp::last_match[1]
-		tokens = Regexp::last_match[2]
-		skip_macro(index, desc, tokens)
-	when %r{^ \s* RULE \( (.*?) , (.*?) \) }x
-		comment(line)
-		desc = Regexp::last_match[1]
-		rules = Regexp::last_match[2]
-		rule_macro(index, desc, rules)
-	end
+	index = convert_line(index, line)
 end
+
+
+
+
