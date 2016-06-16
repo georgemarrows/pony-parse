@@ -55,6 +55,23 @@ RULE = """
     if (not (rINDEX is PARSEOK)) then return rINDEX end
 """
 
+WHILE = """
+    let id_setINDEX = [as Id: TOKEN]
+    while true do
+      state.default_id = TkEof // FIXME parser.eof
+      (let rINDEX: Ast, let foundINDEX: Bool) =
+         parser.parse_token_set(state,
+                                TOKEN.show(),
+                                \"WHILE\",
+                                None,
+                                id_setINDEX,
+                                false)
+      if not (rINDEX is PARSEOK) then return rINDEX end
+      if not foundINDEX then break end
+
+      SUB_RULE
+    end
+"""
 
 def nullToNone(s)
 	if s == "NULL"
@@ -75,14 +92,16 @@ def special_map_token_part(part)
 	end
 end
 
+def convert_token(tok)
+	tok.split(/_/)
+	   .map(&:capitalize)
+	   .map do |part| special_map_token_part(part) end
+	   .join("")
+end
+
 def convert_token_string(tokens)
 	tokens = tokens.strip.split(/\s*,\s*/)
-	tokens.map do |tok|
-		tok.split(/_/)
-		   .map(&:capitalize)
-		   .map do |part| special_map_token_part(part) end
-		   .join("")
-	end.join(", ")
+	tokens.map do |t| convert_token(t) end.join(", ")
 end
 
 def convert_rule_string(rules)
@@ -101,32 +120,39 @@ def macro_convert(index, template, mappings = {})
 end
 
 def convert_line(index, line)
-	print "\n    // #{line.strip}"
-
+	pony = 
 	case line
 	#when %r{^\w*//}  # comment, ignore
 	when %r{^ \s* DEF \( (.*?) \) }x
 		index = 0
-		puts macro_convert(index, DEF, 
-			               :RULE_NAME => $~[1])
+		macro_convert(index, DEF, 
+	                  :RULE_NAME => $~[1])
 	when %r{^ \s* DONE }x
-		puts macro_convert(index, DONE)
+		macro_convert(index, DONE)
 	when %r{^ \s* TOKEN \( (.*?) , (.*?) \) }x
-		puts macro_convert(index, TOKEN,
-			               :RULE_DESC => nullToNone($~[1]),
-			               :TOKENS => convert_token_string($~[2]))
+		macro_convert(index, TOKEN,
+		              :RULE_DESC => nullToNone($~[1]),
+			          :TOKENS => convert_token_string($~[2]))
 	when %r{^ \s* SKIP \( (.*?) , (.*?) \) }x
-		puts macro_convert(index, SKIP,
-			               :RULE_DESC => nullToNone($~[1]),
-			               :TOKENS => convert_token_string($~[2]))
+		macro_convert(index, SKIP,
+			          :RULE_DESC => nullToNone($~[1]),
+			          :TOKENS => convert_token_string($~[2]))
 	when %r{^ \s* RULE \( (.*?) , (.*?) \) }x
-		puts macro_convert(index, RULE,
-			               :RULE_DESC => nullToNone($~[1]),
-			               :RULES => convert_rule_string($~[2])
-			              )
+		macro_convert(index, RULE,
+			          :RULE_DESC => nullToNone($~[1]),
+			          :RULES => convert_rule_string($~[2]))
+
+	when %r{^ \s* WHILE \( (.*?) , (.*) \) }x
+		(index, p) = convert_line(index, $~[2])
+		index += 1
+		macro_convert(index, WHILE,
+			          :TOKEN => convert_token($~[1]),
+			          :SUB_RULE => p)
+	else
+		""
 	end
 
-	index
+	return index, "\n    // #{line.strip}" + pony
 end
 
 
@@ -139,7 +165,8 @@ lines = File.readlines(fname)
 index = 0  # used to uniquify var names in a single Pony function
 lines.each do |line|
 	index += 1
-	index = convert_line(index, line)
+	(index, pony) = convert_line(index, line)
+	puts pony
 end
 
 
