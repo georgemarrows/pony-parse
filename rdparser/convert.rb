@@ -73,6 +73,20 @@ WHILE = """
     end
 """
 
+TERMINATE = """
+     let id_setINDEX: Array[Id] = [as Id: TOKEN]
+
+     (let rINDEX: Ast, let fINDEX: Bool) = 
+         parser.parse_token_set(state, 
+                                None,
+                                \"TERMINATE\",
+                                RULE_DESC, 
+                                id_setINDEX, 
+                                false)
+  
+     if not (rINDEX is PARSEOK) then return rINDEX end
+"""
+
 def nullToNone(s)
 	if s == "NULL"
 		"None"
@@ -93,7 +107,8 @@ def special_map_token_part(part)
 end
 
 def convert_token(tok)
-	tok.split(/_/)
+	tok.strip
+	   .split(/_/)
 	   .map(&:capitalize)
 	   .map do |part| special_map_token_part(part) end
 	   .join("")
@@ -148,6 +163,11 @@ def convert_line(index, line)
 		macro_convert(index, WHILE,
 			          :TOKEN => convert_token($~[1]),
 			          :SUB_RULE => p)
+	when %r{^ \s* TERMINATE \( (.*?) , (.*) \) }x
+	  # TERMINATE("array literal", TK_RSQUARE);
+		macro_convert(index, TERMINATE,
+			          :RULE_DESC => nullToNone($~[1]),
+			          :TOKEN => convert_token($~[2]))
 	else
 		""
 	end
