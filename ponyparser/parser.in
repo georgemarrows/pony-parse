@@ -1,0 +1,23 @@
+// Test file for parsing
+
+// This is not correct Pony grammar - just for testing purposes
+DEF(rawseq);
+  RULE("rawseq", cap)
+  DONE();
+
+
+// Taken from the original parser.c with eg TK_ISO mapped to TkIso etc
+DEF(cap);
+  TOKEN("capability", TK_ISO, TK_TRN, TK_REF, TK_VAL, TK_BOX, TK_TAG);
+  DONE();
+
+
+DEF(array);
+  // PRINT_INLINE();
+  // AST_NODE(TK_ARRAY);
+  SKIP(NULL, TK_LSQUARE, TK_LSQUARE_NEW);
+  // OPT RULE("element type", arraytype);
+  RULE("array element", rawseq);
+  WHILE(TK_COMMA, RULE("array element", rawseq));
+  TERMINATE("array literal", TK_RSQUARE);
+  DONE();
