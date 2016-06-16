@@ -172,7 +172,17 @@ def convert_line(index, line)
 		""
 	end
 
-	return index, "\n    // #{line.strip}" + pony
+	preamble = 
+	  if line.strip == ""
+	  	""
+	  elsif pony == ""
+	  	"    // "
+	  else
+	  	"\n    // "
+	  end
+	postamble = pony == "" ? "" : "\n"
+	
+	return index, preamble + line.strip + pony + postamble
 end
 
 
@@ -181,6 +191,13 @@ end
 fname = ARGV[0]
 
 lines = File.readlines(fname)
+
+# FIXME location of rdparser shouldn't be hardcoded
+puts """
+use \"../rdparser\"   
+
+primitive Grammar
+""".lstrip
 
 index = 0  # used to uniquify var names in a single Pony function
 lines.each do |line|
