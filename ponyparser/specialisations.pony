@@ -16,3 +16,11 @@ class val Token is rd.Token[Id]
 
   new val create(id'': Id) => _id' = id''
   fun id(): Id => _id'
+
+  fun is_lex_error(): Bool => _id' is TkLexError
+
+  fun is_eof(): Bool => _id' is TkEof
+
+  fun is_id(id'': Id): Bool => _id' is id''
+
+  fun show(): String => _id'.show()

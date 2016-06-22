@@ -1,7 +1,3 @@
-trait val Tk is Equatable[Tk]
-  fun show(): String ?
-
-
 primitive PARSEOK is Stringable
   fun string(fmt: FormatSettings = FormatSettingsDefault): String iso^
   =>
@@ -65,7 +61,7 @@ actor Trace
 
 
 
-class Parser[I: Tk val, T: Token[I] val]
+class Parser[I: Any val, T: Token[I] val]
   let _lexer: Lexer[I, T]
   let _eof: I
   let lexerror: I
@@ -91,7 +87,7 @@ class Parser[I: Tk val, T: Token[I] val]
     let oldt: T = _token
     
     _last_token_line = oldt.line_number()
-    if newt.id().eq(_eof) then
+    if newt.is_eof() then
       newt.set_pos(oldt)
     end
 
@@ -176,20 +172,18 @@ class Parser[I: Tk val, T: Token[I] val]
                       id_set: Array[I],
                       make_ast: Bool): ParseResult => 
 
-    let id: I = current_token_id()
-
-    if id.eq(lexerror) then return propogate_error(state) end
+    if current_token().is_lex_error() then return propogate_error(state) end
 
     // FIXME optional vs required in logging
     _trace.log("Rule " + state.rule_name + 
                  " " + cmd_name + " looking for tokens '" +
                  try desc as String else "" end + 
                  "'. Found " +
-                 try id.show() else "XXX" end)
+                 current_token().show())
 
-    for p in id_set.values() do
+    for id in id_set.values() do
 
-      if p.eq(id) then
+      if current_token().is_id(id) then
         _trace.log("  Compatible")
         return if make_ast then
           handle_found(state, consume_token())
@@ -249,9 +243,7 @@ class Parser[I: Tk val, T: Token[I] val]
                          desc: String,
                          cmd_name: String,
                          rule_set: Array[ { (Parser[I, T], String): Ast } box ]): ParseResult => 
-    let id: I = current_token_id()
-
-    if id.eq(lexerror) then return propogate_error(state) end
+    if current_token().is_lex_error() then return propogate_error(state) end
     
     let rule = "Rule " + state.rule_name + " " + cmd_name
 
@@ -278,7 +270,7 @@ class Parser[I: Tk val, T: Token[I] val]
 
 
 
-  fun current_token_id(): I => _token.id()
+  fun current_token(): T => _token
 
   fun propogate_error(state: RuleState[I]): ParseResult => (PARSEERROR, false)
 
