@@ -58,22 +58,6 @@ class RuleState[I: Any val]
     matched = false
 
 
-
-class val Token[I: Any val]
-  let _id: I
-
-  new val create(myid: I) => _id = myid
-  fun line_number(): U32 => 0
-  fun id(): I => _id
-  fun set_pos(other: Token[I]) => true
-
-
-
-interface Lexer[I: Any val]
-  fun ref next(): Token[I]
-
-
-
 actor Trace
   let _out: StdStream
   new create(out: StdStream) => _out = out
@@ -81,17 +65,17 @@ actor Trace
 
 
 
-class Parser[I: Tk val]
-  let _lexer: Lexer[I]
+class Parser[I: Tk val, T: Token[I] val]
+  let _lexer: Lexer[I, T]
   let _eof: I
   let lexerror: I
   let _trace: Trace tag
 
-  var _token: Token[I]
+  var _token: T
   var _last_token_line: U32 = 0
   var _last_matched: String = ""
 
-  new create(lexer: Lexer[I], eof: I, lexerror': I
+  new create(lexer: Lexer[I, T], eof: I, lexerror': I
     , trace: Trace tag
     ) =>
     _lexer = lexer
@@ -103,8 +87,8 @@ class Parser[I: Tk val]
 
 
   fun ref next_lexer_token() =>
-    let newt: Token[I] = _lexer.next() 
-    let oldt: Token[I] = _token
+    let newt: T = _lexer.next() 
+    let oldt: T = _token
     
     _last_token_line = oldt.line_number()
     if newt.id().eq(_eof) then
@@ -264,7 +248,7 @@ class Parser[I: Tk val]
   fun ref parse_rule_set(state: RuleState[I], 
                          desc: String,
                          cmd_name: String,
-                         rule_set: Array[ { (Parser[I], String): Ast } box ]): ParseResult => 
+                         rule_set: Array[ { (Parser[I, T], String): Ast } box ]): ParseResult => 
     let id: I = current_token_id()
 
     if id.eq(lexerror) then return propogate_error(state) end

@@ -7,7 +7,7 @@ but it's not quite there yet. This is for bootstrapping...
 =end
 
 DEF = """
-  fun RULE_NAME(parser: Parser[Id], 
+  fun RULE_NAME(parser: Parser, 
                 rule_desc: String): Ast =>
     let state: RuleState[Id] = RuleState[Id](\"RULE_NAME\", rule_desc, parser.lexerror)
 """
@@ -44,7 +44,7 @@ SKIP = """
 """
 
 RULE = """
-    let rule_setINDEX = [as { (Parser[Id], String): Ast } box: RULES]
+    let rule_setINDEX = [as { (Parser, String): Ast } box: RULES]
 
     (let rINDEX: Ast, let foundINDEX: Bool) = 
         parser.parse_rule_set(state,
@@ -194,7 +194,6 @@ lines = File.readlines(fname)
 
 # FIXME location of rdparser shouldn't be hardcoded
 puts """
-use \"../rdparser\"   
 
 primitive Grammar
 """.lstrip

@@ -1,6 +1,6 @@
 use "ponytest"
 
-use "../../rdparser"
+use rd = "../../rdparser"
 use "../../ponyparser"
 
 
@@ -19,22 +19,22 @@ actor Main is TestList
 
 trait iso _TestParse is UnitTest
   
-  fun test(expected: Ast, 
+  fun test(expected: rd.Ast, 
            ids: Array[Id], 
            h: TestHelper, 
-           rule: { (Parser[Id], String): Ast } box) =>
-    let toks = Array[Token[Id]](ids.size())
+           rule: { (Parser, String): rd.Ast } box) =>
+    let toks = Array[Token](ids.size())
     for id in ids.values() do
-      toks.push(Token[Id](id))
+      toks.push(Token(id))
     end
 
-    let trace = Trace(h.env.out)
+    let trace = rd.Trace(h.env.out)
     trace.log("-----------")
     
-    let l: Lexer[Id] = IterToLexer(toks.values())
-    let p: Parser[Id] = Parser[Id](l, TkEof, TkLexError, trace)
+    let l: rd.Lexer[Id, Token] = IterToLexer(toks.values())
+    let p: Parser = Parser(l, TkEof, TkLexError, trace)
     let actual = rule(p, "blerk")
-    h.assert_is[Ast](expected, actual, 
+    h.assert_is[rd.Ast](expected, actual, 
                      "Expected " + expected.string() + 
                      " actual " + actual.string())  
 
@@ -47,8 +47,8 @@ class iso _TestParseCap is _TestParse
 
   fun apply(h: TestHelper) =>
     let rule = Grammar~cap()
-    test(PARSEOK,    [as Id: TkIso], h, rule)
-    test(PARSEERROR, [as Id: TkLexError], h, rule)
+    test(rd.PARSEOK,    [as Id: TkIso], h, rule)
+    test(rd.PARSEERROR, [as Id: TkLexError], h, rule)
 
 
 class iso _TestParseArray is _TestParse
@@ -59,24 +59,24 @@ class iso _TestParseArray is _TestParse
 
   fun apply(h: TestHelper) =>
     let rule = Grammar~array()
-    test(PARSEOK,    [as Id: TkLSquare, TkIso, TkComma, TkRef, TkRSquare], h, rule)
-    test(RULENOTFOUND, [as Id: TkIso], h, rule)
-    test(PARSEERROR, [as Id: TkLSquare, TkEof], h, rule)
-    test(PARSEERROR, [as Id: TkLSquare, TkLSquare], h, rule)
-    test(PARSEERROR, [as Id: TkLSquare, TkComma], h, rule)
-    test(PARSEERROR, [as Id: TkLSquare, TkComma, TkComma], h, rule)
-    test(PARSEERROR, [as Id: TkLSquare, TkIso, TkIso], h, rule)
+    test(rd.PARSEOK,    [as Id: TkLSquare, TkIso, TkComma, TkRef, TkRSquare], h, rule)
+    test(rd.RULENOTFOUND, [as Id: TkIso], h, rule)
+    test(rd.PARSEERROR, [as Id: TkLSquare, TkEof], h, rule)
+    test(rd.PARSEERROR, [as Id: TkLSquare, TkLSquare], h, rule)
+    test(rd.PARSEERROR, [as Id: TkLSquare, TkComma], h, rule)
+    test(rd.PARSEERROR, [as Id: TkLSquare, TkComma, TkComma], h, rule)
+    test(rd.PARSEERROR, [as Id: TkLSquare, TkIso, TkIso], h, rule)
 
 
   
 
 
 
-class IterToLexer is Lexer[Id]
-  let _iter: Iterator[Token[Id]]
+class IterToLexer is rd.Lexer[Id, Token]
+  let _iter: Iterator[Token]
 
-  new create(iter: Iterator[Token[Id]]) =>
+  new create(iter: Iterator[Token]) =>
     _iter = iter
 
-  fun ref next(): Token[Id] => 
-    try _iter.next() else Token[Id](TkEof) end
+  fun ref next(): Token => 
+    try _iter.next() else Token(TkEof) end
