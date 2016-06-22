@@ -32,7 +32,7 @@ trait iso _TestParse is UnitTest
     trace.log("-----------")
     
     let l: rd.Lexer[Id, Token] = IterToLexer(toks.values())
-    let p: Parser = Parser(l, TkEof, TkLexError, trace)
+    let p: Parser = Parser(l, trace)
     let actual = rule(p, "blerk")
     h.assert_is[rd.Ast](expected, actual, 
                      "Expected " + expected.string() + 

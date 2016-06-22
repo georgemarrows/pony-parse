@@ -30,8 +30,8 @@ typedef struct rule_state_t
   token_id* restart;    // Restart token set, NULL for none
   token_id deflt_id;    // ID of node to create when an optional token or rule
                         // is not found.
-                        // TK_EOF = do not create a default
-                        // TL_LEX_ERROR = rule is not optional
+                        // NoDefault = do not create a default
+                        // NotOptional = rule is not optional
   bool matched;         // Has the rule matched yet
   bool scope;           // Is this rule a scope
   bool deferred;        // Do we have a deferred AST node
@@ -39,18 +39,23 @@ typedef struct rule_state_t
   size_t line, pos;     // Location to claim deferred node is from
 } rule_state_t;
 */
+
+primitive NoDefault
+
+primitive NotOptional
+
 class RuleState[I: Any val]
   let rule_name: String
   let _rule_desc: String
-  var default_id: I
+
+  var default_id: (I | NoDefault | NotOptional)
   var matched: Bool
 
   new create(rule_name': String,
-            rule_desc: String,
-            default_id': I) =>
+            rule_desc: String) =>
     rule_name = rule_name'
     _rule_desc = rule_desc
-    default_id = default_id'
+    default_id = NotOptional
     matched = false
 
 
@@ -63,20 +68,15 @@ actor Trace
 
 class Parser[I: Any val, T: Token[I] val]
   let _lexer: Lexer[I, T]
-  let _eof: I
-  let lexerror: I
   let _trace: Trace tag
 
   var _token: T
   var _last_token_line: U32 = 0
   var _last_matched: String = ""
 
-  new create(lexer: Lexer[I, T], eof: I, lexerror': I
-    , trace: Trace tag
-    ) =>
+  new create(lexer: Lexer[I, T], 
+             trace: Trace tag) =>
     _lexer = lexer
-    _eof = eof
-    lexerror = lexerror'
     _trace = trace
 
     _token = lexer.next()
@@ -287,9 +287,10 @@ class Parser[I: Any val, T: Token[I] val]
                        desc:  (String | None), 
                        terminating: (String | None)): ParseResult =>
 
-    if not state.default_id.eq(lexerror) then
-      // FIXME deferrable_ast
-      state.default_id = lexerror
+    match state.default_id
+    | NotOptional => None
+    else
+      state.default_id = NotOptional
       return (PARSEOK, false)
     end
 

@@ -9,7 +9,7 @@ but it's not quite there yet. This is for bootstrapping...
 DEF = """
   fun RULE_NAME(parser: Parser, 
                 rule_desc: String): Ast =>
-    let state: RuleState[Id] = RuleState[Id](\"RULE_NAME\", rule_desc, parser.lexerror)
+    let state: RuleState[Id] = RuleState[Id](\"RULE_NAME\", rule_desc)
 """
 
 DONE = """
