@@ -23,4 +23,4 @@ class val Token is rd.Token[Id]
 
   fun is_id(id'': Id): Bool => _id' is id''
 
-  fun show(): String => _id'.show()
+  fun show(): String => try _id'.show() else "** show error **" end
